@@ -21,6 +21,7 @@ import random
 import sys
 sys.dont_write_bytecode = True
 import IPython as IP
+from model import *
 
 
 ######################## Data Path ########################
