@@ -8,12 +8,10 @@ import IPython as IP
 
 ###### Get Accuracy
 
-def get_accuracy(dataloader, net, classes, cuda=0):
+def get_accuracy(dataloader, net, classes,cuda=0):
     correct = 0
     total = 0
     for data in dataloader:
-
-        # IP.embed()
         inputs, labels = data
         inputs, labels = inputs.cuda(cuda), labels.cuda(cuda)
 
@@ -23,7 +21,7 @@ def get_accuracy(dataloader, net, classes, cuda=0):
         correct += (predicted == labels).sum()
     return 100.0 * correct / total
 
-def get_class_accuracy(dataloader, net, classes,cuda=0):
+def get_class_accuracy(dataloader, net, classes, cuda=0):
     class_correct = list(0. for i in range(10))
     class_total = list(0. for i in range(10))
     for data in dataloader:
@@ -199,3 +197,33 @@ def expand_lookup_table(lookup_table, w):
     lookup_table = np.insert(lookup_table, 0, min_value)
     lookup_table = np.append(lookup_table, max_value)
     return lookup_table
+
+############################################################
+'''DITHERING'''
+############################################################
+
+# Returns dithered matrix: x0.5, x1, x2: to half, maintain or double weight value according to the dithering percentage.
+# Maintains expected value of the weights. Used with full-precision input matrix.
+'''Hard to explain function. Create your own if reciclying code.'''
+def weight_dithering(x, dith_percentage, cuda=0, dith_levels=1):
+
+    maintain_val = (100-float(dith_percentage)) / 100.0
+
+    k = [2**(level+1) for level in xrange(dith_levels)] # x2 - x1/2, x4 - x 1/4, x8 - x1/8 etc.
+    k_prob = [level/(level+1.0) for level in k] # For each level, get the probability to go to the lower step.
+    # The higher step will be complimentary, which will ensure maintaining the expected value of the weights
+
+    # Get probability of each step and complimentary:
+    k_step_prob = [f(p) for p in k_prob for f in(lambda p: p, lambda p: 1-p)]
+
+    dith_prob = [maintain_val] + [(1-maintain_val)/(dith_levels) * prob for prob in k_step_prob] #Divide prob equally to go to each step
+    new_k = [1.0] + [f(level) for level in k for f in(lambda l: 1/float(l), lambda l: float(l))]
+
+    flip_coin = np.random.random(x.shape) # Create matrix of random nums of size of input Tensor
+    cum_prob_levels =  np.cumsum([0.0] + dith_prob)
+
+    dith_mask = np.zeros(x.shape)
+    for idx in xrange(np.size(new_k)):
+        dith_mask = dith_mask + ((flip_coin > cum_prob_levels[idx]) & (flip_coin < cum_prob_levels[idx+1])) * new_k[idx]
+
+    return x * torch.from_numpy(dith_mask).float().cuda(cuda)

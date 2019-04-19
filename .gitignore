@@ -6,7 +6,7 @@ __pycache__/
 #Files & Folders
 /networks/
 /networksv2/
-
+/results/
 #C extensions
 *.so
 

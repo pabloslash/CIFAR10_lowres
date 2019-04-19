@@ -20,11 +20,11 @@ class Net_cifar(nn.Module):
         self.conv6 = nn.Conv2d(192, 256, 1, padding = 1)
 
         #batch normalization
-        self.batch96 = nn.BatchNorm1d(96)
-        self.batch192 = nn.BatchNorm1d(192)
-        self.batch256 = nn.BatchNorm1d(256)
+        self.batch96 = nn.BatchNorm1d(96, momentum=0.6)
+        self.batch192 = nn.BatchNorm1d(192, momentum=0.6)
+        self.batch256 = nn.BatchNorm1d(256, momentum=0.6)
 
-        # self.dropOut = nn.Dropout2d(p=0.4)
+        self.dropOut = nn.Dropout2d(p=0.4)
 
         #max pooling
         self.mp = nn.MaxPool2d(2, stride=2) #2X2 with stride 2
@@ -34,16 +34,16 @@ class Net_cifar(nn.Module):
 
     def forward(self, x):
 
-        x = F.relu(self.batch96(self.conv1(x)))
-        x = self.mp(F.relu(self.batch96(self.conv2(x))))
-        x = F.relu(self.batch192(self.conv3(x)))
-        x = self.mp(F.relu(self.batch192(self.conv4(x))))
+        x = self.batch96(F.relu(self.conv1(x)))
+        x = self.mp(self.batch96(F.relu(self.conv2(x))))
+        x = self.batch192(F.relu(self.conv3(x)))
+        x = self.mp(self.batch192(F.relu(self.conv4(x))))
 
-        # x = self.dropOut(x)
+        x = self.dropOut(x)
 
-        x = F.relu(self.batch192(self.conv4(x)))
-        x = self.mp(F.relu(self.batch192(self.conv5(x))))
-        x = F.relu(self.batch256(self.conv6(x)))
+        x = self.batch192(F.relu(self.conv4(x)))
+        x = self.mp(self.batch192(F.relu(self.conv5(x))))
+        x = self.batch256(F.relu(self.conv6(x)))
 
         # IP.embed()
 
