@@ -24,7 +24,7 @@ class Net_cifar(nn.Module):
         self.batch192 = nn.BatchNorm1d(192, momentum=0.6)
         self.batch256 = nn.BatchNorm1d(256, momentum=0.6)
 
-        self.dropOut = nn.Dropout2d(p=0.4)
+        # self.dropOut = nn.Dropout2d(p=0.4)
 
         #max pooling
         self.mp = nn.MaxPool2d(2, stride=2) #2X2 with stride 2
@@ -39,7 +39,7 @@ class Net_cifar(nn.Module):
         x = self.batch192(F.relu(self.conv3(x)))
         x = self.mp(self.batch192(F.relu(self.conv4(x))))
 
-        x = self.dropOut(x)
+        # x = self.dropOut(x)
 
         x = self.batch192(F.relu(self.conv4(x)))
         x = self.mp(self.batch192(F.relu(self.conv5(x))))
@@ -53,4 +53,4 @@ class Net_cifar(nn.Module):
         x = self.fc2(x)
         # x = self.fc2(x)
         # x = self.fc2(x)
-        return F.log_softmax(x) #softmax classifier
+        return F.log_softmax(x,dim=1) #softmax classifier

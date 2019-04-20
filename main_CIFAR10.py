@@ -32,7 +32,7 @@ import torch.nn as nn
 ###### Initialize Net & variables:
 ####################################################################
 
-cuda = 1
+cuda = 0
 net = Net_cifar()
 if torch.cuda.is_available():
     net.cuda(cuda)
@@ -146,7 +146,7 @@ def train(ep):
             layers = []
             for layer in net.children():
                 if (isinstance(layer, nn.Conv2d) or isinstance(layer, nn.Linear)):
-                    print('Inside if')
+                    # IP.embed()
                     layers.append(layer.weight.data)
                     layer.weight.data = weight_dithering(layer.weight.data, 50, cuda=cuda, dith_levels=1)
 
@@ -155,17 +155,18 @@ def train(ep):
             loss = criterion(outputs, labels)
             loss.backward()
 
-            # Restore UNDITHERED layers and update
+            # Restore UNDITHER layers and update
             l = 0
             for layer in net.children():
-                IP.embed()
                 if (isinstance(layer, nn.Conv2d) or isinstance(layer, nn.Linear)):
+                    # IP.embed()
                     layer.weight.data = layers[l]
                     l += 1
             optimizer.step()
+            # IP.embed()
 
-        train_accuracy.append(get_accuracy(trainloader, net, cuda))
         net.eval()
+        train_accuracy.append(get_accuracy(trainloader, net, cuda))
         test_accuracy.append(get_accuracy(testloader, net, cuda))
         validation_accuracy.append(get_accuracy(validationloader, net, cuda))
 
@@ -183,7 +184,7 @@ def train(ep):
 '''NOT ADAPTED. FIX THIS FUNCTION TO SAVE MODELS'''
 def test():
     net.eval()
-    test_performance = get_accuracy(testloader, net, classes, torch.cuda.is_available())
+    test_performance = get_accuracy(testloader, net, classes, cuda)
     print ('Test accuracy is {}'.format(test_performance))
     return test_performance
 
