@@ -143,25 +143,32 @@ def train(ep):
 
             # DITHER.
             # This dithers convolutional & fully connected.
-            layers = []
+            layers, count = [], 0
             for layer in net.children():
                 if (isinstance(layer, nn.Conv2d) or isinstance(layer, nn.Linear)):
-                    # IP.embed()
-                    layers.append(layer.weight.data)
-                    layer.weight.data = weight_dithering(layer.weight.data, 50, cuda=cuda, dith_levels=1)
+                    count+=1
+                    if (count == 4):
+                        # IP.embed()
+                        layers.append(layer.weight.data)
+                        layer.weight.data = weight_dithering(layer.weight.data, 40, cuda=cuda, dith_levels=1)
 
             # forward + backward + optimize
+
             outputs = net(inputs)
             loss = criterion(outputs, labels)
             loss.backward()
 
             # Restore UNDITHER layers and update
-            l = 0
+            l, count = 0, 0
             for layer in net.children():
                 if (isinstance(layer, nn.Conv2d) or isinstance(layer, nn.Linear)):
-                    # IP.embed()
-                    layer.weight.data = layers[l]
-                    l += 1
+                    count+=1
+                    if (count == 4):
+                        # IP.embed()
+                        layer.weight.data = layers[l]
+                        l += 1
+
+
             optimizer.step()
             # IP.embed()
 
@@ -198,7 +205,7 @@ def save_model():
     date = datetime.datetime.now()
     date_dir = save_dir + str(date.year) + str(date.month) + str(date.day) + '_' + str(date.hour) + str(date.minute)+ '/'  # Save in todays date.
     os.mkdir(date_dir)
-    model_name = date_dir + 'acc89.75_cifar10_model_fullPrec' + '_Adam_lr' + str(lr) + 'bs' + str(batch_size) + '_1layerdropout50_baselineModel.pt'
+    model_name = date_dir + 'acc90.67_cifar10_model_fullPrec' + '_Adam_lr' + str(lr) + 'bs' + str(batch_size) + '_dithering40_oneLayer.pt'
     torch.save(net.state_dict(), model_name)
 
 def load_model():
