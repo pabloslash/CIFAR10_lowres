@@ -21,7 +21,7 @@ import random
 import sys
 sys.dont_write_bytecode = True
 import IPython as IP
-from model import *
+from model_cifar10 import *
 import os
 import datetime
 import time
@@ -32,8 +32,11 @@ import torch.nn as nn
 ###### Initialize Net & variables:
 ####################################################################
 
+cifar10 = False # False if you desire to load CIFAR-100
+num_classes=10 if (cifar10) else 100
+
 cuda = 0
-net = Net_cifar()
+net = Net_cifar(num_classes=num_classes)
 if torch.cuda.is_available():
     net.cuda(cuda)
 
@@ -43,28 +46,14 @@ lr = 0.001
 
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(net.parameters(), lr=lr)
-# optimizer = optim.SGD(net.parameters(), lr=lr, momentum=0.9)
+# optimizer = optim.SGD(net.parameters(), lr=lr)#, momentum=0.9)
 
 ######################## IMPORT DATA ####################################
 # The output of torchvision datasets are PILImage images of range [0, 1].
 # We transform them to Tensors of normalized range [-1, 1].
-cifar10_path = '/home/pablotostado/Desktop/PT/ML_Datasets/cifar10/'
+cifar_path = '/home/pablotostado/Desktop/PT/ML_Datasets/cifar10/' if (cifar10) else '/home/pablotostado/Desktop/PT/ML_Datasets/cifar100/'
+trainloader, validationloader, testloader, classes = load_cifar(cifar_path, batch_size, cifar10=cifar10, augment=False)
 
-# Load Training + Validation
-trainloader, validationloader = get_train_valid_loader(data_dir=cifar10_path,
-                                                       batch_size=batch_size,
-                                                       augment=True,
-                                                       random_seed=1,
-                                                       shuffle=False,
-                                                       show_sample=False)
-# Load Testing
-testloader = get_test_loader(data_dir=cifar10_path,
-                             batch_size=batch_size,
-                             shuffle=False,
-                             pin_memory=True)
-
-classes = ('plane', 'car', 'bird', 'cat',
-           'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 
 
 ###
@@ -139,18 +128,26 @@ def train(ep):
             inputs, labels = Variable(inputs.cuda(cuda)), Variable(labels.cuda(cuda))
 
             # zero the parameter gradients
+            # print(optimizer)
             optimizer.zero_grad()
+
+            # Stochastic binarization of weights:
+            for layer in net.children():
+                if (isinstance(layer, nn.Conv2d) or isinstance(layer, nn.Linear)):
+                    layer.weight.data = binarize_and_stochRound(layer.weight.data)
+
 
             # DITHER.
             # This dithers convolutional & fully connected.
             layers, count = [], 0
             for layer in net.children():
-                if (isinstance(layer, nn.Conv2d) or isinstance(layer, nn.Linear)):
+                if (isinstance(layer, nn.Linear)): #or isinstance(layer, nn.Conv2d) or
                     count+=1
-                    if (count == 4):
+                    # if (count == 4):
                         # IP.embed()
-                        layers.append(layer.weight.data)
-                        layer.weight.data = weight_dithering(layer.weight.data, 40, cuda=cuda, dith_levels=1)
+                    layers.append(layer.weight.data)
+                    # layer.weight.data = weight_dithering(layer.weight.data, 40, cuda=cuda, dith_levels=1)
+                    layer.weight.data = fullPrec_grid_dithering(layer.weight.data)
 
             # forward + backward + optimize
 
@@ -161,25 +158,26 @@ def train(ep):
             # Restore UNDITHER layers and update
             l, count = 0, 0
             for layer in net.children():
-                if (isinstance(layer, nn.Conv2d) or isinstance(layer, nn.Linear)):
+                if (isinstance(layer, nn.Linear)): # or isinstance(layer, nn.Conv2d)
                     count+=1
-                    if (count == 4):
+                    # if (count == 4):
                         # IP.embed()
-                        layer.weight.data = layers[l]
-                        l += 1
+                    layer.weight.data = layers[l]
+                    l += 1
 
 
             optimizer.step()
-            # IP.embed()
+            # running_loss += loss.data[0]
+            # running_loss = 0.0
 
         net.eval()
         train_accuracy.append(get_accuracy(trainloader, net, cuda))
         test_accuracy.append(get_accuracy(testloader, net, cuda))
         validation_accuracy.append(get_accuracy(validationloader, net, cuda))
 
-        train_class_accuracy.append(get_class_accuracy(trainloader, net, classes, cuda))
-        test_class_accuracy.append(get_class_accuracy(testloader, net, classes, cuda))
-        validation_class_accuracy.append(get_class_accuracy(validationloader, net, classes, cuda))
+        # train_class_accuracy.append(get_class_accuracy(trainloader, net, classes, cuda))
+        # test_class_accuracy.append(get_class_accuracy(testloader, net, classes, cuda))
+        # validation_class_accuracy.append(get_class_accuracy(validationloader, net, classes, cuda))
         print('Epoch {} | Test acc: {} | Validation Accuracy {} | Train Accuracy {}'.format(e+1, test_accuracy[-1], validation_accuracy[-1], train_accuracy[-1]))
 
     print('test accuracy:\n')
@@ -202,15 +200,15 @@ def save_model():
     save_dir = os.getcwd() + "/results/NIPS/"
     if not os.path.isdir(save_dir):
         os.mkdir(save_dir)
-    date = datetime.datetime.now()
-    date_dir = save_dir + str(date.year) + str(date.month) + str(date.day) + '_' + str(date.hour) + str(date.minute)+ '/'  # Save in todays date.
-    os.mkdir(date_dir)
-    model_name = date_dir + 'acc90.67_cifar10_model_fullPrec' + '_Adam_lr' + str(lr) + 'bs' + str(batch_size) + '_dithering40_oneLayer.pt'
+    # date = datetime.datetime.now()
+    # date_dir = save_dir + str(date.year) + str(date.month) + str(date.day) + '_' + str(date.hour) + str(date.minute)+ '/'  # Save in todays date.
+    # os.mkdir(date_dir)
+    model_name = save_dir + 'acc91.37_cifar10_fullPrec' + '_ep300_Adam-SGD_lr' + str(lr) + 'bs' + str(batch_size) + '_dither40_onlyLayer4.pt'
     torch.save(net.state_dict(), model_name)
 
 def load_model():
-    model_name = os.getcwd() + "/results/NIPS/201945_1553/mnist_model_fullPrec_lr0.00025_noDropOut.pt"
-    net.load_state_dict(torch.load(save_dir))
+    model_name = os.getcwd() + "/results/NIPS/acc89.75_cifar10_model_fullPrec_Adam_lr0.001bs20_1layerdropout40_1layer.pt"
+    net.load_state_dict(torch.load(model_name))
 
 #########################################################################################################
 ### PLOTS

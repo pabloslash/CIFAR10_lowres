@@ -17,6 +17,52 @@ from torchvision import datasets, transforms
 from torch.utils.data.sampler import SubsetRandomSampler
 import IPython as IP
 
+def load_cifar(cifar_path, batch_size, cifar10=True, augment=True, shuffle=False):
+    # Load Training + Validation
+    trainloader, validationloader = get_train_valid_loader(data_dir=cifar_path,
+                                                           batch_size=batch_size,
+                                                           augment=augment,
+                                                           random_seed=1,
+                                                           shuffle=shuffle,
+                                                           show_sample=False,
+                                                           cifar10=cifar10)
+    print('Augment: {}'.format(augment))
+    print('cifar10: {}'.format(cifar10))
+    # Load Testing
+    testloader = get_test_loader(data_dir=cifar_path,
+                                 batch_size=batch_size,
+                                 shuffle=False,
+                                 pin_memory=True,
+                                 cifar10=cifar10)
+
+    if cifar10:
+        classes = ('plane', 'car', 'bird', 'cat',
+                   'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+    else:
+        classes = (	'beaver', 'dolphin', 'otter', 'seal', 'whale',
+                    'aquarium', 'fish', 'flatfish', 'ray', 'shark', 'trout',
+                    'orchids', 'poppies', 'roses', 'sunflowers', 'tulips',
+                    'bottles', 'bowls', 'cans', 'cups', 'plates',
+                    'apples', 'mushrooms', 'oranges', 'pears', 'sweet' 'peppers',
+                    'clock', 'computer' 'keyboard', 'lamp', 'telephone', 'television',
+                    'bed', 'chair', 'couch', 'table', 'wardrobe',
+	                'bee', 'beetle', 'butterfly', 'caterpillar', 'cockroach',
+	                'bear', 'leopard', 'lion', 'tiger', 'wolf',
+                    'bridge', 'castle', 'house', 'road', 'skyscraper',
+	                'cloud', 'forest', 'mountain', 'plain', 'sea',
+	                'camel', 'cattle', 'chimpanzee', 'elephant', 'kangaroo',
+	                'fox', 'porcupine', 'possum', 'raccoon', 'skunk',
+                    'crab', 'lobster', 'snail', 'spider', 'worm',
+                    'baby', 'boy', 'girl', 'man', 'woman',
+                    'crocodile', 'dinosaur', 'lizard', 'snake', 'turtle',
+	                'hamster', 'mouse', 'rabbit', 'shrew', 'squirrel',
+	                'maple', 'oak', 'palm', 'pine', 'willow',
+	                'bicycle', 'bus', 'motorcycle', 'pickup' 'truck', 'train',
+	                'lawn-mower', 'rocket', 'streetcar', 'tank', 'tractor')
+
+    return trainloader, validationloader, testloader, classes
+
+
 def get_train_valid_loader(data_dir,
                            batch_size,
                            augment,
@@ -24,6 +70,7 @@ def get_train_valid_loader(data_dir,
                            valid_size=0.1,
                            shuffle=True,
                            show_sample=False,
+                           cifar10=True,
                            num_workers=4,
                            pin_memory=False):
     """
@@ -53,6 +100,8 @@ def get_train_valid_loader(data_dir,
     error_msg = "[!] valid_size should be in the range [0, 1]."
     assert ((valid_size >= 0) and (valid_size <= 1)), error_msg
 
+    print(augment)
+
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
 
@@ -75,11 +124,19 @@ def get_train_valid_loader(data_dir,
         ])
 
     # load the dataset
-    train_dataset = datasets.CIFAR10(root=data_dir, train=True,
-                download=True, transform=train_transform)
+    if cifar10:
+        train_dataset = datasets.CIFAR10(root=data_dir, train=True,
+                    download=True, transform=train_transform)
 
-    valid_dataset = datasets.CIFAR10(root=data_dir, train=True,
-                download=True, transform=valid_transform)
+        valid_dataset = datasets.CIFAR10(root=data_dir, train=True,
+                    download=True, transform=valid_transform)
+
+    else:
+        train_dataset = datasets.CIFAR100(root=data_dir, train=True,
+                    download=True, transform=train_transform)
+
+        valid_dataset = datasets.CIFAR100(root=data_dir, train=True,
+                    download=True, transform=valid_transform)
 
     num_train = len(train_dataset)
     indices = list(range(num_train))
@@ -123,6 +180,7 @@ def get_train_valid_loader(data_dir,
 def get_test_loader(data_dir,
                     batch_size,
                     shuffle=True,
+                    cifar10=True,
                     num_workers=4,
                     pin_memory=False):
     """
@@ -150,10 +208,17 @@ def get_test_loader(data_dir,
         normalize
     ])
 
-    dataset = datasets.CIFAR10(root=data_dir,
-                               train=False,
-                               download=True,
-                               transform=transform)
+    if cifar10:
+        dataset = datasets.CIFAR10(root=data_dir,
+                                   train=False,
+                                   download=True,
+                                   transform=transform)
+
+    else:
+        dataset = datasets.CIFAR100(root=data_dir,
+                                   train=False,
+                                   download=True,
+                                   transform=transform)
 
     data_loader = torch.utils.data.DataLoader(dataset,
                                               batch_size=batch_size,

@@ -18,7 +18,7 @@ def get_accuracy(dataloader, net, classes,cuda=0):
         outputs = net(Variable(inputs))
         _, predicted = torch.max(outputs.data, 1)
         total += labels.size(0)
-        correct += (predicted == labels).sum()
+        correct += (predicted == labels).sum().item()
     return 100.0 * correct / total
 
 def get_class_accuracy(dataloader, net, classes, cuda=0):
@@ -198,6 +198,32 @@ def expand_lookup_table(lookup_table, w):
     lookup_table = np.append(lookup_table, max_value)
     return lookup_table
 
+
+############################################################
+'''TRUNCATION DURING TRAINING'''
+############################################################
+
+'''This function receives a matrix (torch tensor) of floats, binarizes it and stochastically rounds to closest binary exponent'''
+def binarize_and_stochRound(x):
+
+    x += 1e-8                                       # Avoid problems calculating log(0)
+    exp = torch.floor(torch.log2(torch.abs(x)))              # Get binary exponent (absolute value)
+    man = (x / 2**exp)                              # Get mantisa (man \in [1,2])
+
+    flip_coin = (torch.rand(man.shape).cuda() if torch.cuda.is_available() else torch.rand(man.shape)) < (torch.abs(man) - 1.0)              #Flip_coin to stochstically round full_prec binary number
+    exp += flip_coin.float() * 1.0
+
+    stoch_rounded = torch.sign(x)* 2.0**exp
+    return stoch_rounded
+
+'''Same as above function, deterministic rounding'''
+def binarize_and_detRound(x):
+    x += 1e-8
+    exp = torch.round(torch.log2(torch.abs(x))) #deterministically round full_prec binary number
+    det_rounded = torch.sign(x)* 2.0**exp
+
+    return det_rounded
+
 ############################################################
 '''DITHERING'''
 ############################################################
@@ -227,3 +253,28 @@ def weight_dithering(x, dith_percentage, cuda=0, dith_levels=1):
         dith_mask = dith_mask + ((flip_coin > cum_prob_levels[idx]) & (flip_coin < cum_prob_levels[idx+1])) * new_k[idx]
 
     return x * torch.from_numpy(dith_mask).float().cuda(cuda)
+
+'''This function gets a full-precision input matrix and returns a dithered weight matrix where all
+the dithering is to quantized possible values: 2^(x-1), 2^(x), 2^(x+1), 2^(x+2). If (w) lies in one
+concrete quantiation value then there are only 3 potential dithering positions. (GERT CAUWENBERGHS' idea.)'''
+def fullPrec_grid_dithering(x):
+
+    wsgn = np.sign(x)
+    w = np.abs(x)
+    wexp = np.floor(np.log2(w))
+    w_i_left_1 = 2**np.floor(np.log2(w)-0)
+
+    w_i_left_2 = 2**np.floor(np.log2(w)-1)
+    w_i_right_1 = 2**np.floor(np.log2(w)+1)
+    w_i_right_2 = 2**np.floor(np.log2(w)+2)
+
+    p_i_minus_2 = 0.5 * (w-w_i_right_1)/(w_i_left_2-w_i_right_1);
+    p_i_minus_1 = p_i_minus_2 + 0.5*(w-w_i_right_2)/(w_i_left_1-w_i_right_2);
+    p_i_plus_1 = p_i_minus_1 + 0.5*(w-w_i_left_2)/(w_i_right_1-w_i_left_2);
+    p_i_plus_2 = p_i_plus_1 + 0.5*(w-w_i_left_1)/(w_i_right_2-w_i_left_1);
+
+    prob = np.random.random(x.shape)
+
+    x = wsgn * ( 2**( wexp - 1*(prob<p_i_minus_2).float() + 1*((prob >= p_i_minus_1)&(prob<p_i_plus_1)).float() + 2*(prob>=p_i_plus_1).float() ) )
+
+    return x.cuda()
