@@ -40,6 +40,8 @@ class Net_cifar(nn.Module):
         x = self.batch192(F.relu(self.conv3(x)))
         x = self.mp(self.batch192(F.relu(self.conv4(x))))
 
+        x = self.dropOut(x)
+
         x = self.batch192(F.relu(self.conv4(x)))
         x = self.mp(self.batch192(F.relu(self.conv5(x))))
 
@@ -48,9 +50,9 @@ class Net_cifar(nn.Module):
         #print (x.size(1))
         x = F.relu(self.fc(x))
 
-        # x = self.dropOut(x)
+        x = self.dropOut(x)
 
         x = self.fc2(x)
 
-        x = self.dropOut(x)
+        # x = self.dropOut(x)
         return F.log_softmax(x,dim=1) #softmax classifier
