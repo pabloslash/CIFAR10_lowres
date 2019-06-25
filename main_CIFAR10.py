@@ -35,8 +35,8 @@ import torch.nn as nn
 
 cifar10 = False # False if you desire to load CIFAR-100
 num_classes=10 if (cifar10) else 100
-
 cuda = 0
+
 net = Net_cifar(num_classes=num_classes)
 if torch.cuda.is_available():
     net.cuda(cuda)
@@ -132,23 +132,23 @@ def train(ep):
             # print(optimizer)
             optimizer.zero_grad()
 
-            # Stochastic binarization of weights:
-            for layer in net.children():
-                if (isinstance(layer, nn.Conv2d) or isinstance(layer, nn.Linear)):
-                    layer.weight.data = binarize_and_stochRound(layer.weight.data)
+            # # Stochastic binarization of weights:
+            # for layer in net.children():
+            #     if (isinstance(layer, nn.Conv2d) or isinstance(layer, nn.Linear)):
+            #         layer.weight.data = binarize_and_stochRound(layer.weight.data)
 
 
             # DITHER.
             # This dithers convolutional & fully connected.
-            layers, count = [], 0
-            for layer in net.children():
-                if (isinstance(layer, nn.Linear)): #or isinstance(layer, nn.Conv2d) or
-                    count+=1
-                    # if (count == 4):
-                        # IP.embed()
-                    layers.append(layer.weight.data)
-                    # layer.weight.data = weight_dithering(layer.weight.data, 40, cuda=cuda, dith_levels=1)
-                    layer.weight.data = fullPrec_grid_dithering(layer.weight.data)
+            # layers, count = [], 0
+            # for layer in net.children():
+            #     if (isinstance(layer, nn.Linear)): #or isinstance(layer, nn.Conv2d) or
+            #         count+=1
+            #         # if (count == 4):
+            #             # IP.embed()
+            #         layers.append(layer.weight.data)
+            #         # layer.weight.data = weight_dithering(layer.weight.data, 40, cuda=cuda, dith_levels=1)
+            #         layer.weight.data = fullPrec_grid_dithering(layer.weight.data)
 
             # forward + backward + optimize
 
@@ -156,15 +156,15 @@ def train(ep):
             loss = criterion(outputs, labels)
             loss.backward()
 
-            # Restore UNDITHER layers and update
-            l, count = 0, 0
-            for layer in net.children():
-                if (isinstance(layer, nn.Linear)): # or isinstance(layer, nn.Conv2d)
-                    count+=1
-                    # if (count == 4):
-                        # IP.embed()
-                    layer.weight.data = layers[l]
-                    l += 1
+            # # Restore UNDITHER layers and update
+            # l, count = 0, 0
+            # for layer in net.children():
+            #     if (isinstance(layer, nn.Linear)): # or isinstance(layer, nn.Conv2d)
+            #         count+=1
+            #         # if (count == 4):
+            #             # IP.embed()
+            #         layer.weight.data = layers[l]
+            #         l += 1
 
 
             optimizer.step()
